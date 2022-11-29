@@ -15,7 +15,7 @@ from torch.distributions.categorical import Categorical
 from torchvision import transforms as T
 from torch.utils.tensorboard import SummaryWriter
 
-from net_utils import layer_init_ortho, keycard_pixels_from_obs
+from net_utils import layer_init_ortho, keycard_pixels_from_obs, keycard_rect
 from rnd_network import RNDNetwork
 from sd_encoder import SDEncoder
 from doom_gym_wrappers import DoomMaxAndSkipEnv, DoomObservation #, DoomNormalizeReward
@@ -217,8 +217,14 @@ class Agent(nn.Module):
       nn.Embedding(ANGLE_HEALTH_AMMO_NUM_VALUES, GAME_VAR_EMBED_SIZE) for _ in range(self.num_game_and_pos_vars-NUM_POSITION_GAMEVARS)
     ])
     
+    # Keycard pixel crop: This is used to provide the keycard pixels directly to the networks of the algorithm so that
+    # it can learn to explore and change its behaviour based on whether keycards are present or not in the in-game HUD
+    kc_rect = keycard_rect(envs.single_observation_space[0].shape)
+    kc_w = kc_rect[2]-kc_rect[0]
+    kc_h = kc_rect[3]-kc_rect[1]
+    
     self.game_var_size = NUM_POSITION_GAMEVARS*POS_EMBED_SIZE + (self.num_game_and_pos_vars-NUM_POSITION_GAMEVARS)*GAME_VAR_EMBED_SIZE
-    lstm_input_size = net_output_size + self.game_var_size + (3*7*2)
+    lstm_input_size = net_output_size + self.game_var_size + (3*kc_w*kc_h) # NOTE: 3 is for the r, g, and b channels
     
     self.predictor_rnd_net = RNDNetwork(envs.single_observation_space[0].shape, args.rnd_output_size, is_predictor=True)
     self.target_rnd_net = RNDNetwork(envs.single_observation_space[0].shape, args.rnd_output_size, is_predictor=False)
@@ -255,7 +261,7 @@ class Agent(nn.Module):
     # The first 3 tuples are player orientation, health, and ammo
     embed_other_vars = torch.cat([self.other_var_embeddings[i](t.int()).squeeze(1) for i,t in enumerate(var_tuples[:-NUM_POSITION_GAMEVARS])], -1)
     # The keycard pixel c, h, and w values are all flattened for concatenation
-    keycard_pixels = visual_obs[:,0:3,53:60,60:62].flatten(1)
+    keycard_pixels = keycard_pixels_from_obs(visual_obs).flatten(1)
     
     hidden = torch.cat([pixel_conv_out, embed_pos, embed_other_vars, keycard_pixels], -1) # Put it all together for input to LSTM
     

@@ -1,7 +1,7 @@
 
 import torch
 import torch.nn as nn
-from net_utils import layer_init_ortho
+from net_utils import layer_init_ortho, keycard_rect, keycard_pixels_from_obs
 
 class RNDNetwork(nn.Module):
   def __init__(self, obs_shape, out_size, is_predictor) -> None:
@@ -31,11 +31,15 @@ class RNDNetwork(nn.Module):
     self.conv_net.append(nn.Flatten())
     conv_output_size = curr_width*curr_height*curr_channels
     
+    # Key Card pixels
+    kc_rect = keycard_rect(obs_shape)
+    kc_w = kc_rect[2]-kc_rect[0]
+    kc_h = kc_rect[3]-kc_rect[1]
+    
     # Concatenating game state variables into the inputs of each layer:
     # Orientation: 1 value in a [0,127] one-hot encoding
     # Position: 4 values each in a [0,255] one-hot encoding
-    # Key Card pixels: 3x7x2 values in [0,1]
-    gamevar_in_size = int(1*128 + 4*256 + 3*7*2)
+    gamevar_in_size = int(1*128 + 4*256 + 3*kc_w*kc_h) # orientation embed + position embed + keycard pixels
     
     self.is_predictor = is_predictor
     if is_predictor:
@@ -53,8 +57,9 @@ class RNDNetwork(nn.Module):
     var_tuples = torch.chunk(gamevars_obs, gamevars_obs.shape[-1], -1)
     one_hot_ori = nn.functional.one_hot(var_tuples[0].long(), num_classes=128).squeeze(1)
     one_hot_pos = torch.cat([nn.functional.one_hot(t.long(), num_classes=256).squeeze(1) for t in var_tuples[-4:]], -1)
+    
     # The keycard pixel c, h, and w values are all flattened for concatenation
-    keycard_pixels = visual_obs[:,0:3,53:60,60:62].flatten(1)
+    keycard_pixels = keycard_pixels_from_obs(visual_obs).flatten(1)
     
     def cat_gamevars(x):
       return torch.cat([x, one_hot_ori, one_hot_pos, keycard_pixels], -1)

@@ -34,17 +34,18 @@ def conv_layer_init(layer, nonlinearity='linear', a=0, bias_const=True):
   return layer
 
 # Returns the rectangle (x,y,x+w,y+h) for finding the keycard pixels in the scaled down pixel/screenbuffer.
-def keycard_rect(visual_obs):
-  _,_,h,w = visual_obs.shape
-  start_h = int(53.0/60.0 * h)
-  start_w = int(60.0/80.0 * w)
-  end_w   = int(62.0/80.0 * w)
-  return (start_w, start_h, end_w, h)
+# NOTE: The returned rectangle is a inclusive min, exclusive max for use in ranges and array comprehension
+# e.g., x:x+w / range(x,x+w) and y:y+h / range(y,y+h) should be used!
+def keycard_rect(visual_obs_shape):
+  start_h = int(53.0/60.0 * visual_obs_shape[-2])
+  start_w = int(60.0/80.0 * visual_obs_shape[-1])
+  end_w   = int(62.0/80.0 * visual_obs_shape[-1])
+  return (start_w, start_h, end_w, visual_obs_shape[-2])
 
 # This return a tensor of the cropped keycard pixels from the in-game HUD. This is super important
 # information for getting the agent to properly explore a level that has key-locked doors.
 # NOTE: If you change the screen size ratio for vizdoom, this may require modification - it relies
 # on a ratio w:h of 4:3 (originally tested at RES_640X480).
 def keycard_pixels_from_obs(visual_obs):
-  start_w, start_h, end_w, end_h = keycard_rect(visual_obs)
+  start_w, start_h, end_w, end_h = keycard_rect(visual_obs.shape)
   return visual_obs[:, 0:3, start_h:end_h, start_w:end_w]
