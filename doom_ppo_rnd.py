@@ -15,10 +15,11 @@ from torch.distributions.categorical import Categorical
 from torchvision import transforms as T
 from torch.utils.tensorboard import SummaryWriter
 
-from net_init import RNDNetwork, layer_init_ortho
-from sd_conv import SDEncoder
+from net_utils import layer_init_ortho, keycard_pixels_from_obs
+from rnd_network import RNDNetwork
+from sd_encoder import SDEncoder
 from doom_gym_wrappers import DoomMaxAndSkipEnv, DoomObservation #, DoomNormalizeReward
-from doom_general_env_config import DoomGeneralEnvConfig
+from doom_general_env_config import DoomGeneralEnvConfig, NUM_POSITION_GAMEVARS, POSITION_NUM_VALUES, ANGLE_HEALTH_AMMO_NUM_VALUES
 
 from gym.envs.registration import register
 register(
@@ -118,7 +119,7 @@ def parse_args():
   parser.add_argument("--lstm-hidden-size", type=int, default=1468, help="Hidden size of the LSTM")
   parser.add_argument("--lstm-num-layers", type=int, default=1, help="Number of layers in the LSTM") # NOTE: More than one layer doesn't appear to have any benefit
   parser.add_argument("--lstm-dropout", type=float, default=0.0, help="Dropout fraction [0,1] in the LSTM")
-  parser.add_argument("--obs-shape", type=str, default="60,80", # 60,80 works well, 69,92 doesn't appear to help convergence... 
+  parser.add_argument("--obs-shape", type=str, default="60,80", # 60,80 works well, increasing to 69,92 doesn't appear to help convergence...
     help="Shape of the RGB screenbuffer (height, width) after being processed (when fed to the convnet).")
   parser.add_argument("--ch-mult", type=str, default="1,2,3,4", 
     help="Multipliers of '--starting-channels', for the number of channels for each layer of the convolutional network")
@@ -183,7 +184,7 @@ def make_env(args, seed, idx, run_name):
     env = DoomObservation(env, shape=args.obs_shape)
     env = gym.wrappers.RecordEpisodeStatistics(env)
     if args.capture_video and idx == 0:
-        env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
+      env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
     env = DoomMaxAndSkipEnv(env, skip=4)
     
     # NOTE: Removing reward normalization for just extrinsic reward is REQUIRED to get the agent to learn properly
@@ -197,7 +198,6 @@ def make_env(args, seed, idx, run_name):
   return thunk
 
 
-NUM_POS_VARS = 4
 class Agent(nn.Module):
   def __init__(self, args, envs):
     super(Agent, self).__init__()
@@ -207,13 +207,17 @@ class Agent(nn.Module):
     
     self.pixel_convnet = SDEncoder(args, envs)
     
+    # NOTE: I've only tested with values of 256 for positional encoding and 64 for the other game vars
     POS_EMBED_SIZE = 256
     GAME_VAR_EMBED_SIZE = 64
-    self.num_game_and_pos_vars = envs.single_observation_space[1].shape[0]
-    self.pos_embeddings = nn.ModuleList([nn.Embedding(256, POS_EMBED_SIZE) for _ in range(NUM_POS_VARS)])
-    self.other_var_embeddings = nn.ModuleList([nn.Embedding(128, GAME_VAR_EMBED_SIZE) for _ in range(self.num_game_and_pos_vars-NUM_POS_VARS)])
     
-    self.game_var_size = NUM_POS_VARS*POS_EMBED_SIZE + (self.num_game_and_pos_vars-NUM_POS_VARS)*GAME_VAR_EMBED_SIZE
+    self.num_game_and_pos_vars = envs.single_observation_space[1].shape[0]
+    self.pos_embeddings = nn.ModuleList([nn.Embedding(POSITION_NUM_VALUES, POS_EMBED_SIZE) for _ in range(NUM_POSITION_GAMEVARS)])
+    self.other_var_embeddings = nn.ModuleList([
+      nn.Embedding(ANGLE_HEALTH_AMMO_NUM_VALUES, GAME_VAR_EMBED_SIZE) for _ in range(self.num_game_and_pos_vars-NUM_POSITION_GAMEVARS)
+    ])
+    
+    self.game_var_size = NUM_POSITION_GAMEVARS*POS_EMBED_SIZE + (self.num_game_and_pos_vars-NUM_POSITION_GAMEVARS)*GAME_VAR_EMBED_SIZE
     lstm_input_size = net_output_size + self.game_var_size + (3*7*2)
     
     self.predictor_rnd_net = RNDNetwork(envs.single_observation_space[0].shape, args.rnd_output_size, is_predictor=True)
@@ -247,9 +251,9 @@ class Agent(nn.Module):
     
     var_tuples = torch.chunk(gamevars_obs, self.num_game_and_pos_vars, -1)
     # The last 4 tuples are the position information
-    embed_pos = torch.cat([self.pos_embeddings[i](t.int()).squeeze(1) for i,t in enumerate(var_tuples[-NUM_POS_VARS:])], -1)
+    embed_pos = torch.cat([self.pos_embeddings[i](t.int()).squeeze(1) for i,t in enumerate(var_tuples[-NUM_POSITION_GAMEVARS:])], -1)
     # The first 3 tuples are player orientation, health, and ammo
-    embed_other_vars = torch.cat([self.other_var_embeddings[i](t.int()).squeeze(1) for i,t in enumerate(var_tuples[:-NUM_POS_VARS])], -1)
+    embed_other_vars = torch.cat([self.other_var_embeddings[i](t.int()).squeeze(1) for i,t in enumerate(var_tuples[:-NUM_POSITION_GAMEVARS])], -1)
     # The keycard pixel c, h, and w values are all flattened for concatenation
     keycard_pixels = visual_obs[:,0:3,53:60,60:62].flatten(1)
     
@@ -299,15 +303,13 @@ class Agent(nn.Module):
 
 if __name__ == "__main__":
   args = parse_args()
-  
+  device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
   run_name = f"{args.gym_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
 
   random.seed(args.seed)
   np.random.seed(args.seed)
   torch.manual_seed(args.seed)
   torch.backends.cudnn.deterministic = args.torch_deterministic
-
-  device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
   # Setup the Gym environments for vizdoom
   envs = gym.vector.SyncVectorEnv(
@@ -495,8 +497,6 @@ if __name__ == "__main__":
             writer.add_scalar("charts/episodic_length", item["episode"]["l"], global_step)
             writer.add_scalar("charts/cumulative_return", cum_scores[env_idx],  global_step)
             
-            #writer.add_scalar("charts/episodic_return_extrinsic", item["episode"]["r"], global_step)
-            writer.add_scalar("charts/episodic_return_balanced", item["episode"]["r"]-LIVING_REWARD*item["episode"]["l"], global_step) # What the unnormalized extrinsic return was without the living reward/punishment
             writer.add_scalar("charts/episodic_return", item["episode"]["r"], global_step)
             writer.add_scalar("charts/episodic_return_intrinsic", total_rewards_i[env_idx], global_step)
             writer.add_scalar("charts/episodic_return_i+e", total_return, global_step)

@@ -1,38 +1,7 @@
+
 import torch
 import torch.nn as nn
-import numpy as np
-
-def layer_init_ortho(layer, std=np.sqrt(2), bias_const=0.0):
-  nn.init.orthogonal_(layer.weight, std)
-  nn.init.constant_(layer.bias, bias_const)
-  return layer
-
-def fc_layer_init_rnd(layer, std=np.sqrt(2), bias_multiplier=0.01):
-  nn.init.uniform_(layer.weight, -std, std)
-  nn.init.uniform_(layer.bias,   -std*bias_multiplier, std*bias_multiplier)
-  return layer
-
-def fc_layer_init_norm(layer, std=np.sqrt(2)):
-  nn.init.normal_(layer.weight, 0, std)
-  nn.init.normal_(layer.bias, 0, std)
-  with torch.no_grad():
-    layer.bias *= 0.01
-  return layer
-
-def fc_layer_init_xavier(layer, nonlinearity, gain_arg=None):
-  nn.init.xavier_normal_(layer.weight, nn.init.calculate_gain(nonlinearity, gain_arg))
-  nn.init.normal_(layer.bias, 0, 1)
-  with torch.no_grad(): layer.bias *= 0.01
-  return layer
-
-def conv_layer_init(layer, nonlinearity='linear', a=0, bias_const=True):
-  nn.init.kaiming_uniform_(layer.weight, nonlinearity=nonlinearity, a=a) # Change back to kaiming_normal?
-  if bias_const:
-    nn.init.constant_(layer.bias, 0)
-  else:
-    nn.init.uniform_(layer.bias, -0.01, 0.01)
-  return layer
-
+from net_utils import layer_init_ortho
 
 class RNDNetwork(nn.Module):
   def __init__(self, obs_shape, out_size, is_predictor) -> None:

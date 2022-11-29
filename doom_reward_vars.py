@@ -36,45 +36,12 @@ class DoomRewardVar(object):
         self.curr_values[i] = new_value
     return reward
 
-class DoomPosRewardVar(object):
-  
-  def __init__(self) -> None:
-    self.curr_max_radius = 0.0
-    self.init_xyz = np.array([0.,0.,0.])
-    self.xyz_sum_vec = np.array([0.,0.,0.])
-    self.steps_since_explore = 0
-    
-  def _curr_game_xyz(self, game: vzd.DoomGame) -> np.ndarray:
-    return np.array([
-      game.get_game_variable(vzd.GameVariable.POSITION_X),
-      game.get_game_variable(vzd.GameVariable.POSITION_Y),
-      game.get_game_variable(vzd.GameVariable.POSITION_Z),
-    ])
-  
-  def reinit(self, game: vzd.DoomGame) -> None:
-    self.curr_max_radius = 0.0
-    self.init_xyz = self._curr_game_xyz(game)
-    self.xyz_sum_vec = np.array([0.,0.,0.])
-    self.steps_since_explore = 0
 
-  def update_and_calc_reward(self, game: vzd.DoomGame) -> float:
-    reward = 0.0
-    curr_xyz = self._curr_game_xyz(game)
-    diff_vec = curr_xyz - self.init_xyz
-    self.xyz_sum_vec += diff_vec
-    dist = np.sqrt(np.sum(diff_vec**2))
-    
-    radius_diff = dist - self.curr_max_radius
-    if radius_diff > 0:
-      reward += 0.1 * radius_diff
-      self.curr_max_radius = dist
-      self.steps_since_explore = 0
-    else:
-      # TODO: Punish for staying in the same area for a long time...
-      self.steps_since_explore += 1
-
-    return reward
-
+# NOTE: The DoomAdvancedPosRewardVar class doesn't result in the agent exploring better 
+# and is not currently in use in the working version.
+# I've found that this just causes the agent to run around in circles, 
+# 'exploiting' exploration for reward. The better solution is to use the RND network to 
+# create an intrinsic reward based on 'novelty' of observation.
 class DoomAdvancedPosRewardVar(object):
   _SECTOR_SIZE = 50
   _EXPLORE_SECTOR_REWARD = 0.1
@@ -149,4 +116,43 @@ class DoomAdvancedPosRewardVar(object):
         error += dx
         y0 += sy
       
+    return reward
+
+# NOTE: This doesn't work well (see note above).
+class DoomPosRewardVar(object):
+  
+  def __init__(self) -> None:
+    self.curr_max_radius = 0.0
+    self.init_xyz = np.array([0.,0.,0.])
+    self.xyz_sum_vec = np.array([0.,0.,0.])
+    self.steps_since_explore = 0
+    
+  def _curr_game_xyz(self, game: vzd.DoomGame) -> np.ndarray:
+    return np.array([
+      game.get_game_variable(vzd.GameVariable.POSITION_X),
+      game.get_game_variable(vzd.GameVariable.POSITION_Y),
+      game.get_game_variable(vzd.GameVariable.POSITION_Z),
+    ])
+  
+  def reinit(self, game: vzd.DoomGame) -> None:
+    self.curr_max_radius = 0.0
+    self.init_xyz = self._curr_game_xyz(game)
+    self.xyz_sum_vec = np.array([0.,0.,0.])
+    self.steps_since_explore = 0
+
+  def update_and_calc_reward(self, game: vzd.DoomGame) -> float:
+    reward = 0.0
+    curr_xyz = self._curr_game_xyz(game)
+    diff_vec = curr_xyz - self.init_xyz
+    self.xyz_sum_vec += diff_vec
+    dist = np.sqrt(np.sum(diff_vec**2))
+    
+    radius_diff = dist - self.curr_max_radius
+    if radius_diff > 0:
+      reward += 0.1 * radius_diff
+      self.curr_max_radius = dist
+      self.steps_since_explore = 0
+    else:
+      self.steps_since_explore += 1
+
     return reward

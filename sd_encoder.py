@@ -2,7 +2,10 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from net_init import layer_init_ortho, conv_layer_init
+from net_utils import layer_init_ortho, conv_layer_init
+
+# Most of this code was originally taken and modified from the Stable Diffusion autoencoder:
+# https://github.com/CompVis/stable-diffusion/blob/main/ldm/models/autoencoder.py
 
 def _normalize(in_channels, num_groups=16):
   return torch.nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=1e-6, affine=True)

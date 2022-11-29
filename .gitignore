@@ -2,3 +2,4 @@
 runs/
 bin/
 __pycache__/
+_vizdoom.ini

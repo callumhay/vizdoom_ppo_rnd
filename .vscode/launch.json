@@ -16,10 +16,13 @@
         //"--gym-id", "VizdoomCorridor-v0",
         //"--smart-actions", "False", 
         //"--multidiscrete-actions", "True",
-        "--always-run", "False",
-        "--model", "./runs/VizdoomDoomGame-v0/VizdoomDoomGame-v0_doom_ppo_rnd_seed-42_E1M2-levelpasser/doom_ppo_agent_15000000.chkpt",
+
+        // If you want to load you're own model, do it like this:
+        //"--model", "./runs/VizdoomDoomGame-v0/VizdoomDoomGame-v0_doom_ppo_rnd_seed-42_E1M2-levelpasser/doom_ppo_agent_15000000.chkpt",
+
+        "--always-run", "False", // I've found that turning off always-run improves agent performance
         "--map", "E1M2",
-        "--num-envs", "20",
+        "--num-envs", "20", // 12GB of GPU memory can support up to 20 agents, if you have more definitely increase this number for faster training!
         "--num-steps", "256"
       ],
     }

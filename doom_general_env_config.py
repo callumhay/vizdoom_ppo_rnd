@@ -10,6 +10,12 @@ _map_completed_reward = 100.0
 _timeout_reward  = 0     # NOTE: Having ANY timeout reward is detrimental to convergence!
 _episode_timeout = 50000 # NOTE: Having a really long timeout is beneficial to convergence in the general case
 
+NUM_POSITION_GAMEVARS = 4
+POSITION_NUM_VALUES = 256
+ANGLE_HEALTH_AMMO_NUM_VALUES = 128
+
+_HALF_POSITION_NUM_VALUES = POSITION_NUM_VALUES // 2
+
 # Custom config class for the vizdoomenv
 class DoomGeneralEnvConfig(object):
   
@@ -129,21 +135,25 @@ class DoomGeneralEnvConfig(object):
   def game_variable_observations(game):
       obs = []
       
+      # Setup our location/position data so that it all fits into [0,255], split the x,y position into macro and micro chunks/sectors
       MIN_COORD = 0
-      HALF_MAX_COORD = 16256
-      MAX_COORD = 2*HALF_MAX_COORD
+      MAX_COORD = (POSITION_NUM_VALUES-1)*_HALF_POSITION_NUM_VALUES
+      HALF_MAX_COORD = MAX_COORD // 2
+      
       x = min(MAX_COORD, max(MIN_COORD, game.get_game_variable(vzd.GameVariable.POSITION_X)+HALF_MAX_COORD))
       y = min(MAX_COORD, max(MIN_COORD, game.get_game_variable(vzd.GameVariable.POSITION_Y)+HALF_MAX_COORD))
       assert x != MAX_COORD and y != MAX_COORD
-      x_macro = int(x / 128) # 256 possible values [0,256]
-      y_macro = int(y / 128)
-      x_micro = int(x % 256)  # 256 possible values [0,256]
-      y_micro = int(y % 256)
+      x_macro = int(x / _HALF_POSITION_NUM_VALUES) # 256 possible values [0,255]
+      y_macro = int(y / _HALF_POSITION_NUM_VALUES)
+      x_micro = int(x % POSITION_NUM_VALUES)       # 256 possible values [0,255]
+      y_micro = int(y % POSITION_NUM_VALUES)
 
+      # Setup orientation/angle, health, ammo as values with 128 possible values in [0,127]
+      # NOTE: Health and ammo can both be values > 100 in Doom... for simplicity we just clamp to 100
       obs.append(np.array([
-        127 * ((game.get_game_variable(vzd.GameVariable.ANGLE) / 360.0) % 1.0),
-        127 * (min(100, game.get_game_variable(vzd.GameVariable.HEALTH)) / 100.0),
-        127 * (min(100, game.get_game_variable(vzd.GameVariable.SELECTED_WEAPON_AMMO)) / 100.0),
+        (ANGLE_HEALTH_AMMO_NUM_VALUES-1) * ((game.get_game_variable(vzd.GameVariable.ANGLE) / 360.0) % 1.0),
+        (ANGLE_HEALTH_AMMO_NUM_VALUES-1) * (min(100, game.get_game_variable(vzd.GameVariable.HEALTH)) / 100.0),
+        (ANGLE_HEALTH_AMMO_NUM_VALUES-1) * (min(100, game.get_game_variable(vzd.GameVariable.SELECTED_WEAPON_AMMO)) / 100.0),
         x_macro, y_macro, x_micro, y_micro
       ], dtype=np.int32))
 
