@@ -66,8 +66,8 @@ class RNDNetwork(nn.Module):
       
     x = self.conv_net(visual_obs[:,0:3]) # Use rgb only for the visual observation
     if self.is_predictor:
-      x = nn.functional.relu(self.fc_net1(cat_gamevars(x)), inplace=True)#nn.functional.leaky_relu(self.fc_net1(cat_gamevars(x)), 0.1, inplace=True)
-      x = nn.functional.relu(self.fc_net2(cat_gamevars(x)), inplace=True)#nn.functional.leaky_relu(self.fc_net2(cat_gamevars(x)), 0.1, inplace=True)
+      x = nn.functional.leaky_relu(self.fc_net1(cat_gamevars(x)), 0.1, inplace=True) #nn.functional.relu(self.fc_net1(cat_gamevars(x)), inplace=True)
+      x = nn.functional.leaky_relu(self.fc_net2(cat_gamevars(x)), 0.1, inplace=True) #nn.functional.relu(self.fc_net2(cat_gamevars(x)), inplace=True)
       x = self.fc_net3(cat_gamevars(x))
     else:
       x = self.fc_net(cat_gamevars(x))

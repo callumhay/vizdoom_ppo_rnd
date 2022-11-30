@@ -3,3 +3,4 @@ runs/
 bin/doom*.wad
 __pycache__/
 _vizdoom.ini
+.vscode/

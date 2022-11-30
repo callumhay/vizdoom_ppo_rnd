@@ -3,6 +3,7 @@ import os
 import random
 import time
 import re
+from distutils.util import strtobool
 
 import gym
 import vizdoom as vzd
@@ -73,6 +74,8 @@ class SimpleNormalizeReward(object):
     self.return_rms.reset()
 
 def parse_args():
+  bool_val_fn = lambda x: bool(strtobool(x.strip()))
+  
   parser = argparse.ArgumentParser()
   # Top-level program arguments
   parser.add_argument("--model", type=str, default="", help="Preexisting model to load (.chkpt file)")
@@ -82,24 +85,24 @@ def parse_args():
   parser.add_argument("--seed", type=int, default=42, help="RNG seed of the experiment")
   parser.add_argument("--total-timesteps", type=int, default=100000000, help="total timesteps of the experiments")
   parser.add_argument("--save-timesteps", type=int, default=50000, help="Timesteps between network saves")
-  parser.add_argument("--torch-deterministic", type=bool, default=True, help="if toggled, `torch.backends.cudnn.deterministic=False`")
-  parser.add_argument("--cuda", type=bool, default=True, help="if toggled, cuda will be enabled by default")
-  parser.add_argument("--track", type=bool, default=False, help="if toggled, this experiment will be tracked with Weights and Biases")
+  parser.add_argument("--torch-deterministic", type=bool_val_fn, default=True, help="if toggled, `torch.backends.cudnn.deterministic=False`")
+  parser.add_argument("--cuda", type=bool_val_fn, default=True, help="if toggled, cuda will be enabled by default")
+  parser.add_argument("--track", type=bool_val_fn, default=False, help="if toggled, this experiment will be tracked with Weights and Biases")
   parser.add_argument("--wandb-project-name", type=str, default="vizdoom-ppo-rnd", help="the wandb's project name")
   parser.add_argument("--wandb-entity", type=str, default=None, help="the entity (team) of wandb's project")
-  parser.add_argument("--capture-video", type=bool, default=False, help="weather to capture videos of the agent performances (check out `videos` folder)")
+  parser.add_argument("--capture-video", type=bool_val_fn, default=False, help="weather to capture videos of the agent performances (check out `videos` folder)")
 
   # Game specific arguments
   parser.add_argument("--gamepath", type=str, default="bin", help="The path to where the doom.wad and doom2.wad files can be found")
   parser.add_argument("--map", type=str, default="MAP01", help="The map to load when playing the regular doom game scenario")
-  parser.add_argument("--multidiscrete-actions", type=bool, default=False, 
+  parser.add_argument("--multidiscrete-actions", type=bool_val_fn, default=False, 
     help="Whether the agent uses multidiscrete actions (up to 2 at a time) or not - this is disabled automatically if smart-actions are enabled") # NOTE: Multidiscrete converges faster!
-  parser.add_argument("--smart-actions", type=bool, default=True,
+  parser.add_argument("--smart-actions", type=bool_val_fn, default=True,
     help="Whether to use smart multdiscrete actions (e.g., you don't move left and right simulataneously), this limits actions to 2 at a time")
-  parser.add_argument("--always-run", type=bool, default=False, help="Whether all move actions are always done with speed/run")
-  parser.add_argument("--automap", type=bool, default=False, help="Whether to use the automap buffer as part of the observations")
-  parser.add_argument("--labels", type=bool, default=True, help="Whether to use the labels buffer as part of the observations")
-  parser.add_argument("--depth", type=bool, default=False, help="Whether to use the depth buffer as part of the observations")
+  parser.add_argument("--always-run", type=bool_val_fn, default=True, help="Whether all move actions are always done with speed/run")
+  parser.add_argument("--automap", type=bool_val_fn, default=False, help="Whether to use the automap buffer as part of the observations")
+  parser.add_argument("--labels", type=bool_val_fn, default=True, help="Whether to use the labels buffer as part of the observations")
+  parser.add_argument("--depth", type=bool_val_fn, default=False, help="Whether to use the depth buffer as part of the observations")
   
   # Network specific arguments
   parser.add_argument("--z-channels", type=int, default=48, help="Number of z-channels on the last layer of the convolutional network")
@@ -119,14 +122,14 @@ def parse_args():
   parser.add_argument("--num-explore-steps", type=int, default=1000, help="the number of pre-training steps to initialize the normalizers for rewards")
   parser.add_argument("--num-envs", type=int, default=20, help="the number of parallel game environments")
   parser.add_argument("--num-steps", type=int, default=256, help="the number of steps to run in each environment per policy rollout")
-  parser.add_argument("--anneal-lr", type=bool, default=True, help="Toggle learning rate annealing for policy and value networks")
+  parser.add_argument("--anneal-lr", type=bool_val_fn, default=True, help="Toggle learning rate annealing for policy and value networks")
   parser.add_argument("--reward-i-coeff", type=float, default=0.01, help="Coefficient for the intrinsic reward to balance it with the extrinsic reward")
   parser.add_argument("--gamma-e", type=float, default=0.999, help="the discount factor gamma for extrinsic rewards")
   parser.add_argument("--gamma-i", type=float, default=0.99, help="the discount factor gamma for intrinsic rewards")
   parser.add_argument("--gae-lambda", type=float, default=0.95, help="the lambda for the general advantage estimation")
   parser.add_argument("--num-minibatches", type=int, default=4, help="the number of mini-batches")
   parser.add_argument("--update-epochs", type=int, default=4, help="the K epochs to update the policy")
-  parser.add_argument("--norm-adv", type=bool, default=True, help="Toggles advantages normalization")
+  parser.add_argument("--norm-adv", type=bool_val_fn, default=True, help="Toggles advantages normalization")
   parser.add_argument("--clip-coef", type=float, default=0.1, help="the surrogate clipping coefficient")
   parser.add_argument("--ent-coef", type=float, default=0.009, help="coefficient of the entropy")
   parser.add_argument("--vf-coef", type=float, default=0.5, help="coefficient of the value function")
@@ -314,6 +317,7 @@ if __name__ == "__main__":
   )
   #envs = DoomNormalizeObservation(envs) # NOTE: This doesn't improve convergence and adds more overhead, not worth it
   
+  # Create the run directory path for this training session
   run_dir = os.path.join("runs", args.gym_id, run_name)
   os.makedirs(run_dir, exist_ok=True)
   
@@ -326,30 +330,31 @@ if __name__ == "__main__":
   
   reward_i_normalizer = SimpleNormalizeReward(args.num_envs)
   
-  # ALGO Logic: Storage setup
+  # Storage setup: Keeps all the current horizon (args.num_steps) runs for each environment
+  # at each update step. These values are then used for PPO after each environment has run for num_steps
   obs = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space[0].shape).to(device)
   gamevars = torch.zeros((args.num_steps, args.num_envs) + envs.single_observation_space[1].shape).to(device)
   actions = torch.zeros((args.num_steps, args.num_envs) + envs.single_action_space.shape).to(device)
   logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
-  rewards_i = torch.zeros((args.num_steps, args.num_envs)).to(device) 
+  rewards_i = torch.zeros((args.num_steps, args.num_envs)).to(device) # intrinsic rewards
   rewards_e = torch.zeros((args.num_steps, args.num_envs)).to(device) # extrinsic rewards
   dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
-  values_i_e = torch.zeros((args.num_steps, args.num_envs, 2)).to(device) # critic intrinsic,extrinsic values
-
-  total_rewards_i = np.zeros((args.num_envs))
-  total_rewards_i_norm = np.zeros((args.num_envs))
-  total_rewards_e_norm = np.zeros((args.num_envs))
+  values_i_e = torch.zeros((args.num_steps, args.num_envs, 2)).to(device) # critic intrinsic, extrinsic values
+  
+  total_rewards_i = np.zeros((args.num_envs))      # Raw intrinsic rewards (for data tracking only)
+  total_rewards_i_norm = np.zeros((args.num_envs)) # Normalized intrinsic rewards (for data tracking only)
+  total_rewards_e_norm = np.zeros((args.num_envs)) # Normalized extrinsic rewards (for data tracking only)
+  cum_scores = np.zeros(args.num_envs, dtype=np.float64) # Track cumulative scores for each environment (for data tracking only)
 
   global_step = 0
   init_step   = 0 
   num_updates = args.total_timesteps // args.batch_size
    
-  # Load the model if one was provided
+  # Load the checkpoint/model file if one was provided
   if args.model is not None and len(args.model) > 0:
     if os.path.exists(args.model):
       print(f"Model file '{args.model}' found, loading...")
       model_dict = torch.load(args.model)
-
       load_failed = False
       try:
         agent.load_state_dict(model_dict["agent"], strict=False)
@@ -367,7 +372,6 @@ if __name__ == "__main__":
         print("Model loaded!")
       else:
         print("Model loaded with failures.")
-        
     else:
       print(f"Could not find/load model file '{args.model}'")
 
@@ -382,27 +386,28 @@ if __name__ == "__main__":
       monitor_gym=True,
       save_code=True,
     )
+    
+  # Setup TensorBoard
   writer = SummaryWriter(run_dir)
   writer.add_text(
     "hyperparameters",
     "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
-  )
+  ) # Build a markdown table of all the hyperparameters / command line args
 
-  start_time = time.time()
-  
   next_obs_tuple = envs.reset()
   next_obs = torch.Tensor(next_obs_tuple[0]).to(device)
   next_gamevars = torch.Tensor(next_obs_tuple[1]).to(device)
   next_done = torch.zeros(args.num_envs).to(device)
   next_lstm_state = (
-      torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
-      torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
+    torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
+    torch.zeros(agent.lstm.num_layers, args.num_envs, agent.lstm.hidden_size).to(device),
   )  # hidden and cell states (see https://youtu.be/8HyCNIVRbSU)
   
-  cum_scores = np.zeros(args.num_envs, dtype=np.float64)
-
-  # Run for some fixed number of steps on each environment in order to pre-load the normalizers 
-  # of intrinsic and extrinsic rewards
+  
+  # Exploration time!
+  # For some fixed number of steps, we explore in each environment. This is needed
+  # in order to pre-load the reward normalizer(s) so they are better suited to normalize
+  # reward values when the time comes to start training
   print(f"Starting exploration for {args.num_explore_steps} steps...")
   with torch.no_grad():
     for _ in range(args.num_explore_steps):
@@ -416,6 +421,8 @@ if __name__ == "__main__":
       next_done = torch.Tensor(done).to(device)
   print("Finished exploration, starting training...")
 
+  # Training time!
+  start_time = time.time()
   lrnow = args.learning_rate
   for update in range(1, num_updates + 1):
       initial_lstm_state = (next_lstm_state[0].clone(), next_lstm_state[1].clone())
@@ -630,8 +637,10 @@ if __name__ == "__main__":
       writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
       writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
       writer.add_scalar("losses/explained_variance", explained_var, global_step)
-      print("SPS:", int(global_step / (time.time() - start_time)))
-      #writer.add_scalar("charts/SPS", int(global_step-init_step / (time.time() - start_time)), global_step)
+      
+      steps_per_sec = int((global_step - init_step) / (time.time() - start_time))
+      print(f"Steps per second: {steps_per_sec}")
+      #writer.add_scalar("charts/Steps\/s", steps_per_sec, global_step)
 
   envs.close()
   writer.close()
