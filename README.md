@@ -1,8 +1,8 @@
-# vizdoom_ppo_rnd
+# Vizdoom PPO + RND: General Doom Playing Agent using Proximal Policy Optimization and Random Network Distillation
 
 This code base makes use of [Proximal Policy Optimization (PPO)](https://arxiv.org/pdf/1707.06347.pdf) and [Random Network Distillation (RND)](https://arxiv.org/pdf/1810.12894.pdf) to enable a Doom agent to beat levels in Doom and Doom 2 through the use of the vizdoom environment. 
 
-<div style="text-align:center" align="center">
+<div style="text-align:center;margin:0 1em">
 <a style="margin:0 auto" href="https://youtube.com/watch?v=mPff0B6wNSs">
 <img src="https://img.youtube.com/vi/mPff0B6wNSs/0.jpg" width="400">
 </a>
