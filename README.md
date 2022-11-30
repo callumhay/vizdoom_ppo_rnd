@@ -1,14 +1,14 @@
-# Vizdoom PPO + RND: General Doom Playing Agent using Proximal Policy Optimization and Random Network Distillation
+# Vizdoom PPO + RND: A General Doom Playing Agent using Proximal Policy Optimization and Random Network Distillation
 
 This code base makes use of [Proximal Policy Optimization (PPO)](https://arxiv.org/pdf/1707.06347.pdf) and [Random Network Distillation (RND)](https://arxiv.org/pdf/1810.12894.pdf) to enable a Doom agent to beat levels in Doom and Doom 2 through the use of pytorch and the vizdoom environment. 
 
 <p style="text-align:center;margin:0 1em" align="center">
 <a style="margin:0 auto" href="https://youtube.com/watch?v=mPff0B6wNSs">
-<img src="https://img.youtube.com/vi/mPff0B6wNSs/0.jpg" width="400">
+<img src="https://img.youtube.com/vi/mPff0B6wNSs/0.jpg" alt="Passing level E1M2" title="Passing level E1M2" width="400">
 </a>
 </p>
 
-The agent has currently been tested on *Map01 in Doom 2* and *E1M2 in Doom* and is able to learn to beat each level within approximately 6M global steps (across all running environments), this takes around 8 hours on a 12GB Nvidia RTX 3080 with 20 simultaneous environments. More testing is required to get the agent to generalize across further levels. The agent is able to approach perfect play in all basic vizdoom .cfg scenarios in <1M global steps in each scenario. For reproducibility, all training was done using `--seed 42`.
+The agent has currently been tested on *Map01 in Doom 2* and *E1M2 in Doom* and is able to learn to beat each level within approximately 6M global steps (across all running environments), this takes around 8 hours on a 12GB Nvidia RTX 3080 with 20 simultaneous environments. More testing is required to get the agent to generalize across further levels. The agent is able to approach perfect play in all basic vizdoom .cfg scenarios in <1M global steps per scenario. For reproducibility, all training was done using a seed of 42, the seed can be set via the command line (e.g., `--seed 42`).
 
 ## Getting Started
 
@@ -40,7 +40,7 @@ I strongly recommend changing the `num-envs` to the highest possible number you 
 
 *On 12GB of GPU memory, the current implementation is able to run 20 simultaneous training environments. The amount of GPU memory (and the speed of training) should scale linearly with the number of agents.*
 
-If you want to train on a specific vizdoom scenario, a list of them can be found in `doom_gym_wrappers.py` and they can be enabled using the `--gym-id` flag (e.g., `--gym-id VizdoomCorridor-v0`). Note that each scenario will have specific constraints on the action space of the agent. I've found that the best way to train in these scenarios is to enable multi-discrete action spaces (`--multidiscrete-actions True`).
+If you want to train on a specific vizdoom scenario, a list of them can be found in [doom_gym_wrappers.py](doom_gym_wrappers.py) and they can be enabled using the `--gym-id` flag (e.g., `--gym-id VizdoomCorridor-v0`). Note that each scenario will have specific constraints on the action space of the agent. I've found that the best way to train in these scenarios is to enable multi-discrete action spaces (`--multidiscrete-actions True`).
 
 For example, to run the corridor scenaraio, use the following command:
 ```bash
@@ -72,19 +72,20 @@ There are many tweaks and gotchas across this implementation. It's difficult to 
 - Extrinsic reward advantages are double weighted over intrinsic advantages, this can be found in [doom_ppo_rnd.py](https://github.com/callumhay/vizdoom_ppo_rnd/blob/01dded87b1661b9a45ed481e6b331b46cdbbf200/doom_ppo_rnd.py#L552), this implementation detail comes directly from [OpenAI's implementation of RND](https://github.com/openai/random-network-distillation/blob/f75c0f1efa473d5109d487062fd8ed49ddce6634/run_atari.py#L107). For future work, It might be worth playing with this weighting to see if it can be improved for faster training.
 - Intrinsic rewards are normalized, whereas extrinsic rewards are *not*. This turned out to be a crucial implementation detail: I've found that normalizing both rewards keeps  the agent from learning properly. This detail is also used by OpenAI in their RND implementation.
 - I've choosen a small pixel observation width and height (80,60). I've found that this size is a good trade-off between memory constraints and providing the input for sufficient for learning. I'm positive that the agent could be improved via a larger screenbuffer size, but I haven't been able to test it due to GPU memory constraints. If you plan on changing this, be warned that you should also check to make sure the pixel crop for the keycards is still working as intended (i.e., that it's cropping the correct HUD pixels). This code can be found in [net_utils.py](https://github.com/callumhay/vizdoom_ppo_rnd/blob/01dded87b1661b9a45ed481e6b331b46cdbbf200/net_utils.py#L39).
-- I've found that increases to the LSTM input size should result in a proportional change to the hidden size of the LSTM to maintain a 4:1 ratio (input:hidden). In my experience having a hidden size around 1/4 the size of the input has resulted in the best results, though I have not played around with larger hidden size ratios (e.g., > 1/3 the input size). This might be worth experimenting with. In my experience, hidden sizes smaller than 1/4 the input size result in significantly worse agent behaviour.
+- I've found that increases to the LSTM input size should result in a proportional change to the hidden size of the LSTM to maintain a 4:1 ratio (input:hidden). In my experience having a hidden size around 1/4 the size of the input has resulted in the best results, though I have not played around with significantly larger hidden size ratios (e.g., > 1/3 the input size) due to GPU memory constriants. This might be worth experimenting with. In my experience, hidden sizes smaller than 1/4 the input size result in significantly worse agent behaviour.
 - There is an exploration period before training that is necessary to populate the reward normalization buffers so that it can bootstrap an appropriate variance, the number of exploration steps can be set via the command line argument `--num-explore-steps`, the default is currently 1000.
 - The number of steps each environment takes can be set with `--num-steps` and is currently set to 256 by default. This can improve training if set to a larger number, however it comes with the trade-off of more GPU memory.
+- The weighting of the RND network loss via `--pt-coef` was determined empirically to be in the ballpark of [0.001, 0.05] and is currently set by default to 0.005. This is probably worth playing around with more to see if the RND predictor network can be trained more effectively in sync with the other networks.
 
 
 ## Thanks and Acknowledgements
 
-Thank you to the OpenAI team (John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov, Yuri Burda, Harrison Edwards, Amos Storkey) responsible for the development of both PPO and RND algorithms. Furthermore, their [RND repo](https://github.com/openai/random-network-distillation) was incredibly useful in providing a starting point for this implementation.
+Thank you to the OpenAI team (John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov, Yuri Burda, Harrison Edwards, Amos Storkey) responsible for the development of both PPO and RND algorithms. Furthermore, their [RND repo](https://github.com/openai/random-network-distillation) was incredibly useful to providing a starting point for this implementation.
 
-Many thanks to Huang, Shengyi; Dossa, Rousslan Fernand Julien; Raffin, Antonin; Kanervisto, Anssi; and Wang, Weixun for their [super-comprehensive implementations and tips for PPO baselines](https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/).
+Many thanks to Huang, Shengyi; Dossa, Rousslan Fernand Julien; Raffin, Antonin; Kanervisto, Anssi; and Wang, Weixun for their [super-comprehensive implementations and tips for PPO baselines](https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/). Their [atari LSTM PPO implementation](https://github.com/vwxyzjn/ppo-implementation-details/blob/main/ppo_atari_lstm.py) was used as a starting point for this implementation.
 
 Thanks to Marek Wydmuch and the Farama-Foundation for their great work on the [vizdoom environment](https://github.com/Farama-Foundation/ViZDoom).
 
 Thanks to the vizdoomgym team and its contributors for providing a starting point for the [vizdoom gym environment code](https://github.com/shakenes/vizdoomgym) used in this implementation.
 
-Thanks to the Stable Diffusion team and its contributors for open sourcing their [code](https://github.com/CompVis/stable-diffusion), which was used in part for the implementation of the convolutional network in this repo. 
+Thanks to the Stable Diffusion team and its contributors for open sourcing their [code](https://github.com/CompVis/stable-diffusion), which was used in part for the implementation of the convolutional network in this implementation. 

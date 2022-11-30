@@ -310,7 +310,7 @@ if __name__ == "__main__":
 
   # Setup the Gym environments for vizdoom
   envs = gym.vector.SyncVectorEnv(
-      [make_env(args, args.seed + i, i, run_name) for i in range(args.num_envs)]
+    [make_env(args, args.seed + i, i, run_name) for i in range(args.num_envs)]
   )
   #envs = DoomNormalizeObservation(envs) # NOTE: This doesn't improve convergence and adds more overhead, not worth it
   
@@ -508,7 +508,6 @@ if __name__ == "__main__":
             
             break
 
-      # bootstrap value if not done
       with torch.no_grad():
         # (Intrinsic, Extrinsic) value/reward
         advantages_i = torch.zeros_like(rewards_i).to(device)
@@ -543,15 +542,11 @@ if __name__ == "__main__":
       b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
       b_dones = dones.reshape(-1)
       
-      #b_advantages_i = advantages_i.reshape(-1)
-      #b_advantages_e = advantages_e.reshape(-1)
       b_returns_i    = returns_i.reshape(-1)
       b_returns_e    = returns_e.reshape(-1)
       b_values_i     = values_i.reshape(-1)
       b_values_e     = values_e.reshape(-1)
       b_advantages = (advantages_i + 2*advantages_e).reshape(-1)
-      #b_returns    = (returns_i + returns_e).reshape(-1)
-      #b_values     = (values_i + values_e).reshape(-1)
 
       # Optimizing the policy and value network
       assert args.num_envs % args.num_minibatches == 0
@@ -584,37 +579,14 @@ if __name__ == "__main__":
               mb_advantages = b_advantages[mb_inds]
               if args.norm_adv:
                 mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
-              '''
-              mb_advantages_i = b_advantages_i[mb_inds]
-              mb_advantages_e = b_advantages_e[mb_inds]
-              if args.norm_adv:
-                mb_advantages_i = (mb_advantages_i - mb_advantages_i.mean()) / (mb_advantages_i.std() + 1e-8)
-                mb_advantages_e = (mb_advantages_e - mb_advantages_e.mean()) / (mb_advantages_e.std() + 1e-8)
-              '''
 
               # Policy loss
               pg_loss1 = -mb_advantages * ratio
               pg_loss2 = -mb_advantages * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
               pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-              '''
-              pg_loss1_i = -mb_advantages_i * ratio
-              pg_loss2_i = -mb_advantages_i * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
-              pg_loss_i = torch.max(pg_loss1_i, pg_loss2_i).mean()
-              pg_loss1_e = -mb_advantages_e * ratio
-              pg_loss2_e = -mb_advantages_e * torch.clamp(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
-              pg_loss_e = torch.max(pg_loss1_e, pg_loss2_e).mean()
-              '''
 
               # Value loss
-              '''
-              # NOTE: Combining the values/returns for intrinsic+extrinsic doesn't work!
-              newvalue_i_e = newvalue_i_e.sum(dim=-1)
-              v_loss_unclipped = (newvalue_i_e - b_returns[mb_inds]) ** 2
-              v_clipped = b_values[mb_inds] + torch.clamp(newvalue_i_e - b_values[mb_inds], -args.clip_coef, args.clip_coef)
-              v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-              v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-              v_loss = 0.5 * v_loss_max.mean()
-              '''
+              # NOTE: Keeping intrinsic and extrinsic value losses separated is crucial
               newvalue_i, newvalue_e = torch.chunk(newvalue_i_e, 2, dim=-1)
               newvalue_i = newvalue_i.reshape(-1)
               newvalue_e = newvalue_e.reshape(-1)
