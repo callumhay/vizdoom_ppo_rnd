@@ -2,11 +2,11 @@
 
 This code base makes use of [Proximal Policy Optimization (PPO)](https://arxiv.org/pdf/1707.06347.pdf) and [Random Network Distillation (RND)](https://arxiv.org/pdf/1810.12894.pdf) to enable a Doom agent to beat levels in Doom and Doom 2 through the use of the vizdoom environment. 
 
-<div style="text-align:center;margin:0 1em">
+<p style="text-align:center;margin:0 1em" align="center">
 <a style="margin:0 auto" href="https://youtube.com/watch?v=mPff0B6wNSs">
 <img src="https://img.youtube.com/vi/mPff0B6wNSs/0.jpg" width="400">
 </a>
-</div>
+</p>
 
 The agent has currently been tested on *Map01 in Doom 2* and *E1M2 in Doom* and is able to learn to beat each level within approximately 6M global steps (across all running environments), this takes around 8 hours on a 12GB Nvidia RTX 3080 with 20 simultaneous environments. More testing is required to get the agent to generalize across further levels. The agent is able to approach perfect play in all basic vizdoom .cfg scenarios in <1M global steps in each scenario.
 
