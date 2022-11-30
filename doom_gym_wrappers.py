@@ -4,6 +4,22 @@ import numpy as np
 import torch
 from torchvision import transforms as T
 
+def register_vizdoom_gym_envs():
+  from gym.envs.registration import register
+  register(id='VizdoomDoomGame-v0', entry_point='vizdoomgym:VizdoomDoomGame')
+  register(id='VizdoomBasic-v0', entry_point='vizdoomgym:VizdoomBasic')
+  register(id='VizdoomBasicMoreActions-v0', entry_point='vizdoomgym:VizdoomBasicMoreActions')
+  register(id='VizdoomCorridor-v0', entry_point='vizdoomgym:VizdoomCorridor')
+  register(id='VizdoomDefendCenter-v0', entry_point='vizdoomgym:VizdoomDefendCenter')
+  register(id='VizdoomDefendLine-v0', entry_point='vizdoomgym:VizdoomDefendLine')
+  register(id='VizdoomHealthGathering-v0', entry_point='vizdoomgym:VizdoomHealthGathering')
+  register(id='VizdoomMyWayHome-v0', entry_point='vizdoomgym:VizdoomMyWayHome')
+  register(id='VizdoomPredictPosition-v0', entry_point='vizdoomgym:VizdoomPredictPosition')
+  register(id='VizdoomTakeCover-v0', entry_point='vizdoomgym:VizdoomTakeCover')
+  register(id='VizdoomDeathmatch-v0', entry_point='vizdoomgym:VizdoomDeathmatch')
+  register(id='VizdoomHealthGatheringSupreme-v0', entry_point='vizdoomgym:VizdoomHealthGatheringSupreme')
+
+
 class DoomObservation(gym.ObservationWrapper):
   def __init__(self, env, shape) -> None:
     super().__init__(env)

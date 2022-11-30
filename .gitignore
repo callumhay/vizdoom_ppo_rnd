@@ -1,5 +1,5 @@
 
 runs/
-bin/
+bin/doom*.wad
 __pycache__/
 _vizdoom.ini

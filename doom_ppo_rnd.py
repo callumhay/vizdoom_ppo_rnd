@@ -3,7 +3,6 @@ import os
 import random
 import time
 import re
-from distutils.util import strtobool
 
 import gym
 import vizdoom as vzd
@@ -12,20 +11,16 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
-from torchvision import transforms as T
+
 from torch.utils.tensorboard import SummaryWriter
 
 from net_utils import layer_init_ortho, keycard_pixels_from_obs, keycard_rect
 from rnd_network import RNDNetwork
 from sd_encoder import SDEncoder
-from doom_gym_wrappers import DoomMaxAndSkipEnv, DoomObservation #, DoomNormalizeReward
+from doom_gym_wrappers import register_vizdoom_gym_envs, DoomMaxAndSkipEnv, DoomObservation #, DoomNormalizeReward
 from doom_general_env_config import DoomGeneralEnvConfig, NUM_POSITION_GAMEVARS, POSITION_NUM_VALUES, ANGLE_HEALTH_AMMO_NUM_VALUES
 
-from gym.envs.registration import register
-register(
-  id='VizdoomDoomGame-v0',
-  entry_point='vizdoomgym:VizdoomDoomGame'
-)
+register_vizdoom_gym_envs()
 
 class RunningMeanStd(object):
   def __init__(self, epsilon=1e-4, shape=()):
@@ -79,27 +74,20 @@ class SimpleNormalizeReward(object):
 
 def parse_args():
   parser = argparse.ArgumentParser()
+  # Top-level program arguments
   parser.add_argument("--model", type=str, default="", help="Preexisting model to load (.chkpt file)")
-  parser.add_argument("--exp-name", type=str, default=os.path.basename(__file__).rstrip(".py"),
-      help="the name of this experiment")
-  parser.add_argument("--gym-id", type=str, default="VizdoomDoomGame-v0", help="the id of the gym environment")
+  parser.add_argument("--exp-name", type=str, default=os.path.basename(__file__).rstrip(".py"), help="the name of this experiment")
+  parser.add_argument("--gym-id", type=str, default="VizdoomDoomGame-v0", help="the id of the gym environment") # See register_vizdoom_gym_envs() for a listing of all possible ids
   parser.add_argument("--learning-rate", type=float, default=2.5e-4, help="the learning rate of the optimizer")
   parser.add_argument("--seed", type=int, default=42, help="RNG seed of the experiment")
-  parser.add_argument("--total-timesteps", type=int, default=100000000,
-      help="total timesteps of the experiments")
+  parser.add_argument("--total-timesteps", type=int, default=100000000, help="total timesteps of the experiments")
   parser.add_argument("--save-timesteps", type=int, default=50000, help="Timesteps between network saves")
-  parser.add_argument("--torch-deterministic", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
-      help="if toggled, `torch.backends.cudnn.deterministic=False`")
-  parser.add_argument("--cuda", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
-      help="if toggled, cuda will be enabled by default")
-  parser.add_argument("--track", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
-      help="if toggled, this experiment will be tracked with Weights and Biases")
-  parser.add_argument("--wandb-project-name", type=str, default="ppo-implementation-details",
-      help="the wandb's project name")
-  parser.add_argument("--wandb-entity", type=str, default=None,
-      help="the entity (team) of wandb's project")
-  parser.add_argument("--capture-video", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
-      help="weather to capture videos of the agent performances (check out `videos` folder)")
+  parser.add_argument("--torch-deterministic", type=bool, default=True, help="if toggled, `torch.backends.cudnn.deterministic=False`")
+  parser.add_argument("--cuda", type=bool, default=True, help="if toggled, cuda will be enabled by default")
+  parser.add_argument("--track", type=bool, default=False, help="if toggled, this experiment will be tracked with Weights and Biases")
+  parser.add_argument("--wandb-project-name", type=str, default="vizdoom-ppo-rnd", help="the wandb's project name")
+  parser.add_argument("--wandb-entity", type=str, default=None, help="the entity (team) of wandb's project")
+  parser.add_argument("--capture-video", type=bool, default=False, help="weather to capture videos of the agent performances (check out `videos` folder)")
 
   # Game specific arguments
   parser.add_argument("--gamepath", type=str, default="bin", help="The path to where the doom.wad and doom2.wad files can be found")
@@ -117,10 +105,10 @@ def parse_args():
   parser.add_argument("--z-channels", type=int, default=48, help="Number of z-channels on the last layer of the convolutional network")
   parser.add_argument("--net-output-size", type=int, default=4608, help="Output size of the convolutional network, input size to the LSTM")
   parser.add_argument("--lstm-hidden-size", type=int, default=1468, help="Hidden size of the LSTM")
-  parser.add_argument("--lstm-num-layers", type=int, default=1, help="Number of layers in the LSTM") # NOTE: More than one layer doesn't appear to have any benefit
+  parser.add_argument("--lstm-num-layers", type=int, default=1, help="Number of layers in the LSTM") # NOTE: More than one layer doesn't appear to have much benefit (and slows training down a lot!)
   parser.add_argument("--lstm-dropout", type=float, default=0.0, help="Dropout fraction [0,1] in the LSTM")
-  parser.add_argument("--obs-shape", type=str, default="60,80", # 60,80 works well, increasing to 69,92 doesn't appear to help convergence...
-    help="Shape of the RGB screenbuffer (height, width) after being processed (when fed to the convnet).")
+  parser.add_argument("--obs-shape", type=str, default="60,80", # NOTE: 60,80 works well, increasing to 69,92 doesn't appear to help convergence...
+    help="Shape of the RGB screenbuffer (height, width) after being processed (when fed to the convolutional network).")
   parser.add_argument("--ch-mult", type=str, default="1,2,3,4", 
     help="Multipliers of '--starting-channels', for the number of channels for each layer of the convolutional network")
   parser.add_argument("--num-res-blocks", type=int, default=1, help="Number of ResNet blocks in the convolutional network")
@@ -131,16 +119,14 @@ def parse_args():
   parser.add_argument("--num-explore-steps", type=int, default=1000, help="the number of pre-training steps to initialize the normalizers for rewards")
   parser.add_argument("--num-envs", type=int, default=20, help="the number of parallel game environments")
   parser.add_argument("--num-steps", type=int, default=256, help="the number of steps to run in each environment per policy rollout")
-  parser.add_argument("--anneal-lr", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
-      help="Toggle learning rate annealing for policy and value networks")
+  parser.add_argument("--anneal-lr", type=bool, default=True, help="Toggle learning rate annealing for policy and value networks")
   parser.add_argument("--reward-i-coeff", type=float, default=0.01, help="Coefficient for the intrinsic reward to balance it with the extrinsic reward")
   parser.add_argument("--gamma-e", type=float, default=0.999, help="the discount factor gamma for extrinsic rewards")
   parser.add_argument("--gamma-i", type=float, default=0.99, help="the discount factor gamma for intrinsic rewards")
   parser.add_argument("--gae-lambda", type=float, default=0.95, help="the lambda for the general advantage estimation")
   parser.add_argument("--num-minibatches", type=int, default=4, help="the number of mini-batches")
   parser.add_argument("--update-epochs", type=int, default=4, help="the K epochs to update the policy")
-  parser.add_argument("--norm-adv", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
-      help="Toggles advantages normalization")
+  parser.add_argument("--norm-adv", type=bool, default=True, help="Toggles advantages normalization")
   parser.add_argument("--clip-coef", type=float, default=0.1, help="the surrogate clipping coefficient")
   parser.add_argument("--ent-coef", type=float, default=0.009, help="coefficient of the entropy")
   parser.add_argument("--vf-coef", type=float, default=0.5, help="coefficient of the value function")
@@ -149,8 +135,13 @@ def parse_args():
   parser.add_argument("--target-kl", type=float, default=None, help="the target KL divergence threshold")
   
   args = parser.parse_args()
+  
+  # Multi-discrete and smart actions are mutually exclusive... 
+  # TODO: Should probably make them an enum at some point.
   if args.smart_actions:
     args.multidiscrete_actions = False
+  elif args.multidiscrete_actions:
+    args.smart_actions = False
   
   args.obs_shape = tuple([int(item) for item in args.obs_shape.split(',')])
   args.ch_mult = [int(item) for item in args.ch_mult.split(',')]
@@ -164,13 +155,13 @@ def make_env(args, seed, idx, run_name):
   def thunk():
     max_buttons_pressed = 0 if args.multidiscrete_actions else 1
     doom_game_config = DoomGeneralEnvConfig(args.map, disable_explore_reward=True, living_reward=-0.005) if args.gym_id == "VizdoomDoomGame-v0" else None
-
-    wad_file = "doom2.wad" if re.search(r"E\d+M\d+", args.map) == None else "doom.wad" # Doom maps are formated "E1M1", whereas Doom2 maps are "Map01"
-    game_path = os.path.join(args.gamepath, wad_file) 
+    wad_file = "doom2.wad" if re.search(r"[Ee]\d+[Mm]\d+", args.map) == None else "doom.wad" # Doom maps are formatted "E1M1", whereas Doom2 maps are "Map01"
+    game_dir = os.path.join(os.path.dirname(__file__), args.gamepath)
     env = gym.make(
-      args.gym_id, 
-      set_window_visible=(idx==0), 
-      game_path=game_path,
+      args.gym_id,
+      set_window_visible=(idx==0),
+      game_dir=game_dir,
+      wad_path=os.path.join(game_dir, wad_file),
       resolution=vzd.ScreenResolution.RES_200X150,
       max_buttons_pressed=max_buttons_pressed,
       smart_actions=args.smart_actions,

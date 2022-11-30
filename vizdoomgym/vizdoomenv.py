@@ -47,17 +47,17 @@ class VizdoomEnv(gym.Env):
       self.custom_config = kwargs.get("custom_config", None)
       
       window_visible = kwargs.get("set_window_visible", False)
-      scenarios_dir = os.path.join(os.path.dirname(__file__), "scenarios")
-      game_path = kwargs.get("game_path", scenarios_dir)
+      game_dir = kwargs.get("game_dir", "bin")
+      wad_gamepath = kwargs.get("wad_path", os.path.join(game_dir, "doom2.wad"))
       resolution = kwargs.get("resolution", vzd.ScreenResolution.RES_640X480)
       max_buttons_pressed = 2 if self.smart_actions else kwargs.get("max_buttons_pressed", 1)
 
       # init game
       self.game = vzd.DoomGame()
-      self.game.set_doom_game_path(game_path)
+      self.game.set_doom_game_path(wad_gamepath)
       
       if level >= 0 and level < len(CONFIGS):
-        self.game.load_config(os.path.join(scenarios_dir, CONFIGS[level][0]))
+        self.game.load_config(os.path.join(game_dir, CONFIGS[level][0]))
         
       self.game.set_screen_resolution(resolution)
       self.game.set_episode_start_time(10)

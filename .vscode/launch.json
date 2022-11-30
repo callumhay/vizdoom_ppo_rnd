@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: Vizdoom PPO RND",
+      "name": "Python: Vizdoom PPO RND - General Game",
       "type": "python",
       "request": "launch",
       "program": "${file}",
@@ -13,18 +13,29 @@
       "justMyCode": false,
       "cwd": "${fileDirname}",
       "args": [
-        //"--gym-id", "VizdoomCorridor-v0",
-        //"--smart-actions", "False", 
-        //"--multidiscrete-actions", "True",
-
-        // If you want to load you're own model, do it like this:
-        //"--model", "./runs/VizdoomDoomGame-v0/VizdoomDoomGame-v0_doom_ppo_rnd_seed-42_E1M2-levelpasser/doom_ppo_agent_15000000.chkpt",
-
-        "--always-run", "False", // I've found that turning off always-run improves agent performance
         "--map", "E1M2",
-        "--num-envs", "20", // 12GB of GPU memory can support up to 20 agents, if you have more definitely increase this number for faster training!
+        "--num-envs", "20",  // 12GB of GPU memory can support up to 20 agents, if you have more definitely increase this number for faster training!
         "--num-steps", "256"
+        //"--model", "<path_to_chkpt_file>", // If you want to load you're own model, do it like this
+      ],
+    },
+    {
+      "name": "Python: Vizdoom PPO RND - Scenario",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${fileDirname}",
+      "args": [
+        "--gym-id", "VizdoomCorridor-v0",
+        "--smart-actions", "False", 
+        "--multidiscrete-actions", "True",
+        "--num-envs", "20",
+        "--num-steps", "256"
+        //"--model", "<path_to_chkpt_file>", // If you want to load you're own model, do it like this
       ],
     }
+
   ]
 }
