@@ -1,6 +1,6 @@
 # Vizdoom PPO + RND: General Doom Playing Agent using Proximal Policy Optimization and Random Network Distillation
 
-This code base makes use of [Proximal Policy Optimization (PPO)](https://arxiv.org/pdf/1707.06347.pdf) and [Random Network Distillation (RND)](https://arxiv.org/pdf/1810.12894.pdf) to enable a Doom agent to beat levels in Doom and Doom 2 through the use of the vizdoom environment. 
+This code base makes use of [Proximal Policy Optimization (PPO)](https://arxiv.org/pdf/1707.06347.pdf) and [Random Network Distillation (RND)](https://arxiv.org/pdf/1810.12894.pdf) to enable a Doom agent to beat levels in Doom and Doom 2 through the use of pytorch and the vizdoom environment. 
 
 <p style="text-align:center;margin:0 1em" align="center">
 <a style="margin:0 auto" href="https://youtube.com/watch?v=mPff0B6wNSs">
@@ -8,7 +8,7 @@ This code base makes use of [Proximal Policy Optimization (PPO)](https://arxiv.o
 </a>
 </p>
 
-The agent has currently been tested on *Map01 in Doom 2* and *E1M2 in Doom* and is able to learn to beat each level within approximately 6M global steps (across all running environments), this takes around 8 hours on a 12GB Nvidia RTX 3080 with 20 simultaneous environments. More testing is required to get the agent to generalize across further levels. The agent is able to approach perfect play in all basic vizdoom .cfg scenarios in <1M global steps in each scenario.
+The agent has currently been tested on *Map01 in Doom 2* and *E1M2 in Doom* and is able to learn to beat each level within approximately 6M global steps (across all running environments), this takes around 8 hours on a 12GB Nvidia RTX 3080 with 20 simultaneous environments. More testing is required to get the agent to generalize across further levels. The agent is able to approach perfect play in all basic vizdoom .cfg scenarios in <1M global steps in each scenario. For reproducibility, all training was done using `--seed 42`.
 
 ## Getting Started
 
@@ -25,7 +25,7 @@ You will need to copy your `doom.wad` and `doom2.wad` files into the `bin` direc
 
 **Wandb**
 
-For online tracking information (integrates seemlessly with the Tensorboard data tracking). Pass the command line arg `--track` to activate it.
+Can be used for online tracking information (integrates seemlessly with the Tensorboard data tracking). Pass the command line arg `--track` to activate it.
 ```bash
 conda install -c conda-forge wandb
 ```
@@ -49,7 +49,7 @@ python doom_ppo_rnd.py --gym-id VizdoomCorridor-v0 --multidiscrete-actions True
 
 ###  Model Saving and Loading
 
-During training the model will automatically save at global step intervals, determined by the command line argument `--save-timesteps`. When saving takes place, a model checkpoint file will be generated in a unique run directory under `runs/<gym_env_id>/<unique_run_dir>`. All tensorboard stats data will also be placed in this same directory.
+During training the model will automatically save at global step intervals, determined by the command line argument `--save-timesteps`. When saving takes place, a model checkpoint file will be generated in a unique run directory under `runs/<gym_env_id>/<unique_run_dir>`. This directory will be created at the start of training and all tensorboard stats data will also be placed and updated in this same directory over the course of training.
 
 To load a saved model for further training you can use the command line argument `--model <path_to_my_saved_model>`.
 
@@ -66,7 +66,7 @@ The code makes use of the following networks for each agent:
 - An actor network which takes the output of the LSTM to produce the distribution of actions for the agent to take
 - A critic network that produces a single valued output for each agent to compare against generated rewards
 
-There are many tweaks and gotchas across this implementation. It's difficult to enumerate them all, but here are some of the key things to consider:
+There are many tweaks and gotchas across this implementation. It's difficult to enumerate them all, but here are some of the key details to consider:
 
 - The weighting of the intrinsic vs. extrinsic reward is important, this can be modified via the command line argument `--reward-i-coeff`, which will set the coefficient to the intrinsic reward. By default this is set to a low value (0.01) so that the agent doesn't overweigh the rewards it gets from RND (i.e., intrinsic rewards) vs. the rewards its getting from the environment (i.e., extrinsic rewards)
 - Extrinsic reward advantages are double weighted over intrinsic advantages, this can be found in [doom_ppo_rnd.py](https://github.com/callumhay/vizdoom_ppo_rnd/blob/01dded87b1661b9a45ed481e6b331b46cdbbf200/doom_ppo_rnd.py#L552), this implementation detail comes directly from [OpenAI's implementation of RND](https://github.com/openai/random-network-distillation/blob/f75c0f1efa473d5109d487062fd8ed49ddce6634/run_atari.py#L107). For future work, It might be worth playing with this weighting to see if it can be improved for faster training.
