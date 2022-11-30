@@ -38,6 +38,8 @@ python doom_ppo_rnd.py --map E1M2 --num-envs 20
 ```
 I strongly recommend changing the `num-envs` to the highest possible number you can fit in your GPU memory for faster training.
 
+*On 12GB of GPU memory, the current implementation is able to run 20 simultaneous training environments. The amount of GPU memory (and the speed of training) should scale linearly with the number of agents.*
+
 If you want to train on a specific vizdoom scenario, a list of them can be found in `doom_gym_wrappers.py` and they can be enabled using the `--gym-id` flag (e.g., `--gym-id VizdoomCorridor-v0`). Note that each scenario will have specific constraints on the action space of the agent. I've found that the best way to train in these scenarios is to enable multi-discrete action spaces (`--multidiscrete-actions True`).
 
 For example, to run the corridor scenaraio, use the following command:
@@ -64,15 +66,22 @@ The code makes use of the following networks for each agent:
 - An actor network which takes the output of the LSTM to produce the distribution of actions for the agent to take
 - A critic network that produces a single valued output for each agent to compare against generated rewards
 
+There are many tweaks and gotchas across this implementation. It's difficult to enumerate them all, but here are some of the key things to consider:
 
-On 12GB of GPU memory, the current implementation is able to run 20 simultaneous training environments. The amount of GPU memory (and the speed of training) should scale linearly with the number of agents.
+- The weighting of the intrinsic vs. extrinsic reward is important, this can be modified via the command line argument `--reward-i-coeff`, which will set the coefficient to the intrinsic reward. By default this is set to a low value (0.01) so that the agent doesn't overweigh the rewards it gets from RND (i.e., intrinsic rewards) vs. the rewards its getting from the environment (i.e., extrinsic rewards)
+- Extrinsic reward advantages are double weighted over intrinsic advantages, this can be found in [doom_ppo_rnd.py](https://github.com/callumhay/vizdoom_ppo_rnd/blob/01dded87b1661b9a45ed481e6b331b46cdbbf200/doom_ppo_rnd.py#L552), this implementation detail comes directly from [OpenAI's implementation of RND](https://github.com/openai/random-network-distillation/blob/f75c0f1efa473d5109d487062fd8ed49ddce6634/run_atari.py#L107). For future work, It might be worth playing with this weighting to see if it can be improved for faster training.
+- Intrinsic rewards are normalized, whereas extrinsic rewards are *not*. This turned out to be a crucial implementation detail: I've found that normalizing both rewards keeps  the agent from learning properly. This detail is also used by OpenAI in their RND implementation.
+- I've choosen a small pixel observation width and height (80,60). I've found that this size is a good trade-off between memory constraints and providing the input for sufficient for learning. I'm positive that the agent could be improved via a larger screenbuffer size, but I haven't been able to test it due to GPU memory constraints. If you plan on changing this, be warned that you should also check to make sure the pixel crop for the keycards is still working as intended (i.e., that it's cropping the correct HUD pixels). This code can be found in [net_utils.py](https://github.com/callumhay/vizdoom_ppo_rnd/blob/01dded87b1661b9a45ed481e6b331b46cdbbf200/net_utils.py#L39).
+- I've found that increases to the LSTM input size should result in a proportional change to the hidden size of the LSTM to maintain a 4:1 ratio (input:hidden). In my experience having a hidden size around 1/4 the size of the input has resulted in the best results, though I have not played around with larger hidden size ratios (e.g., > 1/3 the input size). This might be worth experimenting with. In my experience, hidden sizes smaller than 1/4 the input size result in significantly worse agent behaviour.
+- There is an exploration period before training that is necessary to populate the reward normalization buffers so that it can bootstrap an appropriate variance, the number of exploration steps can be set via the command line argument `--num-explore-steps`, the default is currently 1000.
+- The number of steps each environment takes can be set with `--num-steps` and is currently set to 256 by default. This can improve training if set to a larger number, however it comes with the trade-off of more GPU memory.
 
 
 ## Thanks and Acknowledgements
 
-Thank you to the OpenAI team (John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov, Yuri Burda, Harrison Edwards, Amos Storkey) responsible for the development of both PPO and RND algorithms.
+Thank you to the OpenAI team (John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov, Yuri Burda, Harrison Edwards, Amos Storkey) responsible for the development of both PPO and RND algorithms. Furthermore, their [RND repo](https://github.com/openai/random-network-distillation) was incredibly useful in providing a starting point for this implementation.
 
-Many thanks to Huang, Shengyi; Dossa, Rousslan Fernand Julien; Raffin, Antonin; Kanervisto, Anssi; and Wang, Weixun for their [super comprehensive implementations and tips for PPO baselines](https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/).
+Many thanks to Huang, Shengyi; Dossa, Rousslan Fernand Julien; Raffin, Antonin; Kanervisto, Anssi; and Wang, Weixun for their [super-comprehensive implementations and tips for PPO baselines](https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/).
 
 Thanks to Marek Wydmuch and the Farama-Foundation for their great work on the [vizdoom environment](https://github.com/Farama-Foundation/ViZDoom).
 
