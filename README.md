@@ -30,7 +30,7 @@ Can be used for online tracking information (integrates seemlessly with the Tens
 conda install -c conda-forge wandb
 ```
 
-### Running / Training an Agent
+## Running / Training an Agent
 
 To train the agent on doom level E1M2 you can run the following command:
 ```bash
@@ -52,6 +52,10 @@ python doom_ppo_rnd.py --gym-id VizdoomCorridor-v0 --multidiscrete-actions True
 During training the model will automatically save at global step intervals, determined by the command line argument `--save-timesteps`. When saving takes place, a model checkpoint file will be generated in a unique run directory under `runs/<gym_env_id>/<unique_run_dir>`. This directory will be created at the start of training and all tensorboard stats data will also be placed and updated in this same directory over the course of training.
 
 To load a saved model for further training you can use the command line argument `--model <path_to_my_saved_model>`.
+
+### Visualizing Agents
+
+By default the first agent will be displayed in a window for your viewing pleasure. This is currently hardcoded in [doom_ppo_rnd.py](doom_ppo_rnd.py) by passing the bool `window_visible` argument to the env at initialization. Feel free to change this, just remember that each visible window will require more video memory that could be used for training :P
 
 
 ## Implementation Details
@@ -77,10 +81,19 @@ There are many tweaks and gotchas across this implementation. It's difficult to 
 - The number of steps each environment takes can be set with `--num-steps` and is currently set to 256 by default. This can improve training if set to a larger number, however it comes with the trade-off of more GPU memory.
 - The weighting of the RND network loss via `--pt-coef` was determined empirically to be in the ballpark of [0.001, 0.05] and is currently set by default to 0.005. This is probably worth playing around with more to see if the RND predictor network can be trained more effectively in sync with the other networks.
 - Extrinsic reward structuring is something I've played around with a lot and have had to revisit many times throughout this project. You can find the structure of these in [doom_general_env_config.py](doom_general_env_config.py) and [doom_reward_vars.py](doom_reward_vars.py). The current reward structure appears to work fairly well:
-  - There is currently a small living penalty (i.e., the agent is punished for every step of gameplay), I've found this to be necessary to get the agent to be more expedient and to drive it towards significant rewards (e.g., passing levels). Training may benefit from a larger living penalty, but I haven't tested this with the latest code. Likely the best penalty is one that balances well with the intrinsic reward such that seeing new things overcomes the penalty, but eventually decays back to a penalty once the agent has been exposed to that same situation repeatedly.
+  - There is currently a small living penalty (i.e., the agent is punished for every step of gameplay), I've found this to be necessary to get the agent to be more expedient, driving it towards significant rewards (e.g., passing levels). Training may benefit from a larger living penalty, but I haven't tested this with the latest code. Likely the best penalty is one that balances well with the intrinsic reward such that seeing new things overcomes the penalty, but eventually decays back to a penalty once the agent has been exposed to that same situation repeatedly.
   - There is currently a small ammo use penalty, this is tricky to balance: If the penalty is too high the agent will avoid shooting entirely, if it's too low it will waste ammo indiscriminately.
-  - The agent currently gets rewarded for doing damage but this also includes damage to environmental objects, specifically barrels (this has to do with how vizdoom events work). As a result, it likes abusing this reward by blowing up barrels for better or worse; don't worry, the agent eventually learns to stop blowing up barrels in its face ;) 
+  - The agent currently gets rewarded for doing damage but this also includes damage to environmental objects, specifically barrels (this has to do with how vizdoom events work). As a result, it likes abusing this reward by blowing up barrels for better or worse; don't worry, the agent eventually learns to stop blowing up barrels in its face ;)
   - Feel free to modify these rewards; however, *I strongly recommend not tying any extrinsic rewards to exploration-based activities* (i.e., don't give rewards or penalties for visiting or avoiding locations/coordinates in the environment). Tying extrinsic rewards to exploration-specific events results in all sorts of poor agent behaviour (aimless circling, stopping/staying, etc.). The code makes use of RND to remedy this problem, all exploration-related reward should be deferred to the RND network whenever possible.
+
+
+## Considerations for Future Improvements
+
+- Increase the size of the screenbuffer, the size of the visual latent coming out of the [convolutional encoder](sd_encoder.py); and the consequentially, the input and hidden size of the LSTM. In my testing, increases in the capacity of the LSTM has consistently resulted in better agent performance. This will require a system with >12GB of GPU memory.
+- Augmenting vizdoom to provide better explicit events and state information (e.g., simple enumerations/bools for keycards that the agent has in its possession). It would also be nice if damage to monsters vs. the environment could be separated for better extrinsic reward signaling.
+- Currently, the agent uses whatever weapon it has on screen and relies on pick-ups/ammo to switch its active weapon. Adding *explicit* weapon selection to the action space of the agent could be beneficial in later levels, some work would need to be done to implement an [action masking](https://costa.sh/blog-a-closer-look-at-invalid-action-masking-in-policy-gradient-algorithms.html) system, to avoid wasted training time on trying to use weapons that the agent hasn't acquired yet.
+- It would be neat if audio could factor in to the agent input at somepoint. When I play Doom, I personally find many cues to be audio-driven (e.g., hearing imps in the next room or invisible pinkies running through the halls).
+- Better auto-balancing between extrinsic and intrinsic rewards (and avoiding magic coefficients). Striking the right balance between weighting these rewards has a huge impact on the agent's performance and training time. I'm not sure what a better solution would look like though.
 
 
 ## Thanks and Acknowledgements

@@ -46,7 +46,7 @@ class VizdoomEnv(gym.Env):
       self.always_run = kwargs.get("always_run", False)
       self.custom_config = kwargs.get("custom_config", None)
       
-      window_visible = kwargs.get("set_window_visible", False)
+      window_visible = kwargs.get("window_visible", False)
       game_dir = kwargs.get("game_dir", "bin")
       wad_gamepath = kwargs.get("wad_path", os.path.join(game_dir, "doom2.wad"))
       resolution = kwargs.get("resolution", vzd.ScreenResolution.RES_640X480)

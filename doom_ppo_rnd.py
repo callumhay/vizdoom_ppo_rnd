@@ -162,7 +162,7 @@ def make_env(args, seed, idx, run_name):
     game_dir = os.path.join(os.path.dirname(__file__), args.gamepath)
     env = gym.make(
       args.gym_id,
-      set_window_visible=(idx==0),
+      window_visible=(idx==0),
       game_dir=game_dir,
       wad_path=os.path.join(game_dir, wad_file),
       resolution=vzd.ScreenResolution.RES_200X150,
