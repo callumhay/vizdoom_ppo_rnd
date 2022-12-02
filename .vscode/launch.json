@@ -16,7 +16,7 @@
         "--map", "E1M3",
         "--num-envs", "20",  // 12GB of GPU memory can support up to 20 agents, if you have more definitely increase this number for faster training!
         "--num-steps", "256",
-        "--model", "/mnt/dev/doom_rl/viewer/testbed/doom_ppo/runs/VizdoomDoomGame-v0/VizdoomDoomGame-v0_doom_ppo_rnd_seed-42_E1M2-levelpasser/doom_ppo_agent_15000000.chkpt", // If you want to load you're own model, do it like this
+        "--model", "./runs/VizdoomDoomGame-v0/VizdoomDoomGame-v0__doom_ppo_rnd__42__1669838928/doom_ppo_agent_41000000.chkpt", // If you want to load you're own model, do it like this
       ],
     },
     {

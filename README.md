@@ -1,4 +1,4 @@
-# Vizdoom PPO + RND: A General Doom Playing Agent using Proximal Policy Optimization and Random Network Distillation
+# Vizdoom PPO + RND: Towards a General Doom Playing Agent using Proximal Policy Optimization and Random Network Distillation
 
 This code base makes use of [Proximal Policy Optimization (PPO)](https://arxiv.org/pdf/1707.06347.pdf) and [Random Network Distillation (RND)](https://arxiv.org/pdf/1810.12894.pdf) to enable a Doom agent to beat levels in Doom and Doom 2 through the use of pytorch and the vizdoom environment.
 
@@ -89,11 +89,13 @@ There are many tweaks and gotchas across this implementation. It's difficult to 
 
 ## Considerations for Future Improvements
 
+- Better learning rate scheduling - currently this is just a linear interpolation based on the update step, but it might be beneficial to use a 'smart' decay rate based on plateauing of reward (e.g., pytorch ReduceLROnPlateau). This would need a lot of tweaking to find the right parameters for its factor and patience parameters.
 - Increase the size of the screenbuffer, the size of the visual latent coming out of the [convolutional encoder](sd_encoder.py); and the consequentially, the input and hidden size of the LSTM. In my testing, increases in the capacity of the LSTM has consistently resulted in better agent performance. This will require a system with >12GB of GPU memory.
 - Augmenting vizdoom to provide better explicit events and state information (e.g., simple enumerations/bools for keycards that the agent has in its possession). It would also be nice if damage to monsters vs. the environment could be separated for better extrinsic reward signaling.
 - Currently, the agent uses whatever weapon it has on screen and relies on pick-ups/ammo to switch its active weapon. Adding *explicit* weapon selection to the action space of the agent could be beneficial in later levels, some work would need to be done to implement an [action masking](https://costa.sh/blog-a-closer-look-at-invalid-action-masking-in-policy-gradient-algorithms.html) system, to avoid wasted training time on trying to use weapons that the agent hasn't acquired yet.
 - It would be neat if audio could factor in to the agent input at somepoint. When I play Doom, I personally find many cues to be audio-driven (e.g., hearing imps in the next room or invisible pinkies running through the halls).
 - Better auto-balancing between extrinsic and intrinsic rewards (and avoiding magic coefficients). Striking the right balance between weighting these rewards has a huge impact on the agent's performance and training time. I'm not sure what a better solution would look like though.
+- The label buffer that's currently provided to the network contains a lot of extraneous labels that are probably not adavantageous to the agent (e.g., misc environmental objects), it might help training to remove some of these objects from the buffer on the GPU side via pytorch (since doing it in numpy can be very slow).
 
 
 ## Thanks and Acknowledgements

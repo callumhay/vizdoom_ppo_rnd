@@ -123,6 +123,7 @@ def parse_args():
   parser.add_argument("--num-envs", type=int, default=20, help="the number of parallel game environments")
   parser.add_argument("--num-steps", type=int, default=256, help="the number of steps to run in each environment per policy rollout")
   parser.add_argument("--anneal-lr", type=bool_val_fn, default=True, help="Toggle learning rate annealing for policy and value networks")
+  parser.add_argument("--lr-multiplier", type=float, default=0.9999, help="Amount to multiply the learning rate by at each update (if --anneal-lr is enabled).")
   parser.add_argument("--reward-i-coeff", type=float, default=0.01, help="Coefficient for the intrinsic reward to balance it with the extrinsic reward")
   parser.add_argument("--gamma-e", type=float, default=0.999, help="the discount factor gamma for extrinsic rewards")
   parser.add_argument("--gamma-i", type=float, default=0.99, help="the discount factor gamma for intrinsic rewards")
@@ -428,8 +429,7 @@ if __name__ == "__main__":
       initial_lstm_state = (next_lstm_state[0].clone(), next_lstm_state[1].clone())
 
       if args.anneal_lr:
-        frac = 1.0 - 1.5*(update - 1.0) / (num_updates)
-        lrnow = frac * args.learning_rate
+        lrnow *= args.lr_multiplier
         optimizer.param_groups[0]["lr"] = lrnow
 
       for step in range(0, args.num_steps):
